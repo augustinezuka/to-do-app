@@ -1,33 +1,14 @@
 "use client";
 import { motion } from "framer-motion";
-import { Stars } from "@react-three/drei";
-import { Canvas } from "@react-three/fiber";
 import Link from "next/link";
 
 export default function NotFound() {
   return (
     <div className="relative min-h-screen w-full overflow-hidden bg-black text-white">
-      {/* 3D Starfield */}
-      <div className="absolute inset-0 -z-20">
-        <Canvas>
-          <Stars
-            radius={300}
-            depth={80}
-            count={30000}
-            factor={5}
-            saturation={1}
-            fade
-            speed={2}
-          />
-        </Canvas>
-      </div>
-
-      {/* Nebula Glows */}
       <div className="absolute w-[600px] h-[600px] bg-purple-600/30 blur-[200px] rounded-full top-0 left-0 animate-pulse"></div>
       <div className="absolute w-[500px] h-[500px] bg-fuchsia-500/30 blur-[200px] rounded-full bottom-0 right-20 animate-pulse"></div>
       <div className="absolute w-[450px] h-[450px] bg-indigo-500/30 blur-[180px] rounded-full top-1/3 right-1/3 animate-pulse"></div>
 
-      {/* Floating Planet */}
       <motion.img
         src="https://i.imgur.com/5QFQ7QB.png"
         alt="Planet"
@@ -37,7 +18,6 @@ export default function NotFound() {
         transition={{ duration: 60, repeat: Infinity, ease: "linear" }}
       />
 
-      {/* UFO Passing By */}
       <motion.img
         src="https://i.imgur.com/fb1dJvA.png"
         alt="UFO"
@@ -52,7 +32,6 @@ export default function NotFound() {
         }}
       />
 
-      {/* Comet */}
       <motion.div
         className="absolute w-2 h-2 bg-white rounded-full shadow-[0_0_25px_white]"
         initial={{ x: -200, y: -100 }}
@@ -124,7 +103,6 @@ export default function NotFound() {
           className="w-64 opacity-90 mt-20 drop-shadow-[0_0_25px_rgba(255,255,255,0.7)]"
         />
 
-        {/* Footer */}
         <div className="absolute bottom-8 text-sm opacity-40">
           Lost in Space © {new Date().getFullYear()}
         </div>
