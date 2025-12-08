@@ -1,7 +1,3 @@
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-nocheck
-/* eslint-disable */
-
 "use client";
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,19 +27,79 @@ import {
   ArrowRight,
 } from "lucide-react";
 
-const createAuthToken = (username, userId) => {
-  return btoa(
-    JSON.stringify({
-      sub: userId,
-      username,
-      email: `${username}@example.com`,
-      exp: Date.now() + 3600000,
-      iat: Date.now(),
-    }),
-  );
+// Created by augustinezuka@gmail.com
+
+// ============================================================================
+// TYPES
+// ============================================================================
+
+interface AuthToken {
+  sub: string;
+  username: string;
+  email: string;
+  exp: number;
+  iat: number;
+}
+
+interface User {
+  id: string;
+  username: string;
+  email: string;
+  password: string;
+  createdAt: number;
+}
+
+interface Session {
+  id: string;
+  userId: string;
+  username: string;
+  token: string;
+  createdAt: number;
+  lastActivity: number;
+}
+
+interface Column {
+  id: string;
+  title: string;
+  order: number;
+}
+
+interface Task {
+  id: string;
+  columnId: string;
+  title: string;
+  description: string;
+  priority: "low" | "medium" | "high";
+  progress: number;
+  createdAt: number;
+  order: number;
+}
+
+interface Board {
+  columns: Column[];
+  tasks: Task[];
+}
+
+type Theme = "light" | "dark";
+type ViewMode = "kanban" | "list";
+type AuthMode = "login" | "signup";
+
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
+
+const createAuthToken = (username: string, userId: string): string => {
+  const token: AuthToken = {
+    sub: userId,
+    username,
+    email: `${username}@example.com`,
+    exp: Date.now() + 3600000,
+    iat: Date.now(),
+  };
+  return btoa(JSON.stringify(token));
 };
 
-const hashPassword = (password) => {
+const hashPassword = (password: string): string => {
   return btoa(password + "salt123");
 };
 
@@ -53,16 +109,17 @@ const STORAGE_KEYS = {
   BOARDS: "kanban_boards",
   SYNC: "kanban_sync",
   THEME: "kanban_theme",
-};
+} as const;
 
-const saveToStorage = (key, data) => {
+//eslint-disable-next-line
+const saveToStorage = (key: string, data: any): void => {
   localStorage.setItem(key, JSON.stringify(data));
   localStorage.setItem(STORAGE_KEYS.SYNC, Date.now().toString());
   localStorage.removeItem(STORAGE_KEYS.SYNC);
   localStorage.setItem(STORAGE_KEYS.SYNC, Date.now().toString());
 };
 
-const loadFromStorage = (key, defaultValue = null) => {
+const loadFromStorage = <T,>(key: string, defaultValue: T): T => {
   try {
     const data = localStorage.getItem(key);
     return data ? JSON.parse(data) : defaultValue;
@@ -71,7 +128,7 @@ const loadFromStorage = (key, defaultValue = null) => {
   }
 };
 
-const decodeToken = (token) => {
+const decodeToken = (token: string): AuthToken | null => {
   try {
     return JSON.parse(atob(token));
   } catch {
@@ -79,15 +136,19 @@ const decodeToken = (token) => {
   }
 };
 
-const registerUser = (username, email, password) => {
-  const users = loadFromStorage(STORAGE_KEYS.USERS, {});
+const registerUser = (
+  username: string,
+  email: string,
+  password: string,
+): User => {
+  const users = loadFromStorage<Record<string, User>>(STORAGE_KEYS.USERS, {});
 
   if (users[username]) {
     throw new Error("Username already exists");
   }
 
   const userId = `user-${Date.now()}`;
-  users[username] = {
+  const newUser: User = {
     id: userId,
     username,
     email,
@@ -95,9 +156,13 @@ const registerUser = (username, email, password) => {
     createdAt: Date.now(),
   };
 
+  users[username] = newUser;
   saveToStorage(STORAGE_KEYS.USERS, users);
 
-  const boards = loadFromStorage(STORAGE_KEYS.BOARDS, {});
+  const boards = loadFromStorage<Record<string, Board>>(
+    STORAGE_KEYS.BOARDS,
+    {},
+  );
   boards[userId] = {
     columns: [
       { id: "col-1", title: "To Do", order: 0 },
@@ -108,11 +173,11 @@ const registerUser = (username, email, password) => {
   };
   saveToStorage(STORAGE_KEYS.BOARDS, boards);
 
-  return users[username];
+  return newUser;
 };
 
-const authenticateUser = (username, password) => {
-  const users = loadFromStorage(STORAGE_KEYS.USERS, {});
+const authenticateUser = (username: string, password: string): User => {
+  const users = loadFromStorage<Record<string, User>>(STORAGE_KEYS.USERS, {});
   const user = users[username];
 
   if (!user || user.password !== hashPassword(password)) {
@@ -126,11 +191,11 @@ const authenticateUser = (username, password) => {
 // SESSION MANAGEMENT
 // ============================================================================
 
-const createSession = (userId, username) => {
-  const sessions = loadFromStorage(STORAGE_KEYS.SESSIONS, []);
+const createSession = (userId: string, username: string): Session => {
+  const sessions = loadFromStorage<Session[]>(STORAGE_KEYS.SESSIONS, []);
   const token = createAuthToken(username, userId);
 
-  const session = {
+  const session: Session = {
     id: `session-${Date.now()}-${Math.random().toString(36).substring(7)}`,
     userId,
     username,
@@ -145,16 +210,16 @@ const createSession = (userId, username) => {
   return session;
 };
 
-const getAllSessions = () => {
-  return loadFromStorage(STORAGE_KEYS.SESSIONS, []);
+const getAllSessions = (): Session[] => {
+  return loadFromStorage<Session[]>(STORAGE_KEYS.SESSIONS, []);
 };
 
-const getSessionById = (sessionId) => {
+const getSessionById = (sessionId: string): Session | undefined => {
   const sessions = getAllSessions();
   return sessions.find((s) => s.id === sessionId);
 };
 
-const deleteSession = (sessionId) => {
+const deleteSession = (sessionId: string): void => {
   const sessions = getAllSessions();
   saveToStorage(
     STORAGE_KEYS.SESSIONS,
@@ -162,7 +227,7 @@ const deleteSession = (sessionId) => {
   );
 };
 
-const deleteAllSessions = () => {
+const deleteAllSessions = (): void => {
   saveToStorage(STORAGE_KEYS.SESSIONS, []);
 };
 
@@ -170,8 +235,11 @@ const deleteAllSessions = () => {
 // BOARD DATA MANAGEMENT
 // ============================================================================
 
-const getUserBoard = (userId) => {
-  const boards = loadFromStorage(STORAGE_KEYS.BOARDS, {});
+const getUserBoard = (userId: string): Board => {
+  const boards = loadFromStorage<Record<string, Board>>(
+    STORAGE_KEYS.BOARDS,
+    {},
+  );
   if (!boards[userId]) {
     boards[userId] = {
       columns: [
@@ -186,15 +254,18 @@ const getUserBoard = (userId) => {
   return boards[userId];
 };
 
-const saveUserBoard = (userId, board) => {
-  const boards = loadFromStorage(STORAGE_KEYS.BOARDS, {});
+const saveUserBoard = (userId: string, board: Board): void => {
+  const boards = loadFromStorage<Record<string, Board>>(
+    STORAGE_KEYS.BOARDS,
+    {},
+  );
   boards[userId] = board;
   saveToStorage(STORAGE_KEYS.BOARDS, boards);
 };
 
-const createColumn = (userId, title) => {
+const createColumn = (userId: string, title: string): Column => {
   const board = getUserBoard(userId);
-  const newColumn = {
+  const newColumn: Column = {
     id: `col-${Date.now()}`,
     title,
     order: board.columns.length,
@@ -204,7 +275,11 @@ const createColumn = (userId, title) => {
   return newColumn;
 };
 
-const updateColumn = (userId, columnId, updates) => {
+const updateColumn = (
+  userId: string,
+  columnId: string,
+  updates: Partial<Column>,
+): void => {
   const board = getUserBoard(userId);
   const column = board.columns.find((c) => c.id === columnId);
   if (column) {
@@ -213,7 +288,7 @@ const updateColumn = (userId, columnId, updates) => {
   }
 };
 
-const deleteColumn = (userId, columnId) => {
+const deleteColumn = (userId: string, columnId: string): void => {
   const board = getUserBoard(userId);
   board.columns = board.columns.filter((c) => c.id !== columnId);
   board.tasks = board.tasks.filter((t) => t.columnId !== columnId);
@@ -221,19 +296,21 @@ const deleteColumn = (userId, columnId) => {
 };
 
 const createTask = (
-  userId,
-  columnId,
-  title,
-  description = "",
-  priority = "medium",
-) => {
+  userId: string,
+  columnId: string,
+  title: string,
+  description: string = "",
+  priority: Task["priority"] = "medium",
+  progress: number = 0,
+): Task => {
   const board = getUserBoard(userId);
-  const newTask = {
+  const newTask: Task = {
     id: `task-${Date.now()}`,
     columnId,
     title,
     description,
     priority,
+    progress,
     createdAt: Date.now(),
     order: board.tasks.filter((t) => t.columnId === columnId).length,
   };
@@ -242,7 +319,11 @@ const createTask = (
   return newTask;
 };
 
-const updateTask = (userId, taskId, updates) => {
+const updateTask = (
+  userId: string,
+  taskId: string,
+  updates: Partial<Task>,
+): void => {
   const board = getUserBoard(userId);
   const task = board.tasks.find((t) => t.id === taskId);
   if (task) {
@@ -251,7 +332,7 @@ const updateTask = (userId, taskId, updates) => {
   }
 };
 
-const deleteTask = (userId, taskId) => {
+const deleteTask = (userId: string, taskId: string): void => {
   const board = getUserBoard(userId);
   board.tasks = board.tasks.filter((t) => t.id !== taskId);
   saveUserBoard(userId, board);
@@ -261,11 +342,11 @@ const deleteTask = (userId, taskId) => {
 // THEME MANAGEMENT
 // ============================================================================
 
-const getTheme = () => {
-  return loadFromStorage(STORAGE_KEYS.THEME, "light");
+const getTheme = (): Theme => {
+  return loadFromStorage<Theme>(STORAGE_KEYS.THEME, "light");
 };
 
-const setTheme = (theme) => {
+const setTheme = (theme: Theme): void => {
   saveToStorage(STORAGE_KEYS.THEME, theme);
 };
 
@@ -273,7 +354,13 @@ const setTheme = (theme) => {
 // PRIORITY BADGE COMPONENT
 // ============================================================================
 
-const PriorityBadge = ({ priority, theme }) => {
+const PriorityBadge = ({
+  priority,
+  theme,
+}: {
+  priority: Task["priority"];
+  theme: Theme;
+}) => {
   const colors = {
     high:
       theme === "dark"
@@ -306,15 +393,59 @@ const PriorityBadge = ({ priority, theme }) => {
 };
 
 // ============================================================================
+// PROGRESS BAR COMPONENT
+// ============================================================================
+
+const ProgressBar = ({
+  progress,
+  theme,
+}: {
+  progress: number;
+  theme: Theme;
+}) => {
+  return (
+    <div className="w-full">
+      <div className="flex justify-between items-center mb-1">
+        <span
+          className={`text-xs ${theme === "dark" ? "text-slate-400" : "text-slate-600"}`}
+        >
+          Progress
+        </span>
+        <span
+          className={`text-xs font-medium ${theme === "dark" ? "text-slate-300" : "text-slate-700"}`}
+        >
+          {progress}%
+        </span>
+      </div>
+      <div
+        className={`w-full h-2 rounded-full overflow-hidden ${theme === "dark" ? "bg-slate-600" : "bg-slate-200"}`}
+      >
+        <div
+          className="h-full bg-indigo-600 transition-all duration-300"
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
 // LANDING PAGE COMPONENT
 // ============================================================================
 
-const LandingPage = ({ onGetStarted, theme, toggleTheme }) => {
+const LandingPage = ({
+  onGetStarted,
+  theme,
+  toggleTheme,
+}: {
+  onGetStarted: () => void;
+  theme: Theme;
+  toggleTheme: () => void;
+}) => {
   return (
     <div
       className={`min-h-screen ${theme === "dark" ? "bg-slate-900" : "bg-white"}`}
     >
-      {/* Header */}
       <header
         className={`border-b ${theme === "dark" ? "border-slate-800" : "border-slate-200"}`}
       >
@@ -350,7 +481,6 @@ const LandingPage = ({ onGetStarted, theme, toggleTheme }) => {
         </div>
       </header>
 
-      {/* Hero Section */}
       <div className="max-w-6xl mx-auto px-4 py-20 text-center">
         <h2
           className={`text-5xl font-bold mb-6 ${theme === "dark" ? "text-white" : "text-slate-900"}`}
@@ -363,7 +493,7 @@ const LandingPage = ({ onGetStarted, theme, toggleTheme }) => {
           className={`text-xl mb-8 max-w-2xl mx-auto ${theme === "dark" ? "text-slate-400" : "text-slate-600"}`}
         >
           A simple, powerful kanban board to manage tasks, prioritize work, and
-          collaborate with your team.
+          track progress.
         </p>
         <Button
           size="lg"
@@ -373,9 +503,13 @@ const LandingPage = ({ onGetStarted, theme, toggleTheme }) => {
           Get Started Free
           <ArrowRight className="w-5 h-5 ml-2" />
         </Button>
+        <p
+          className={`text-xs mt-8 ${theme === "dark" ? "text-slate-500" : "text-slate-400"}`}
+        >
+          Created by augustinezuka@gmail.com
+        </p>
       </div>
 
-      {/* Features */}
       <div className="max-w-6xl mx-auto px-4 py-16 grid md:grid-cols-3 gap-8">
         <div
           className={`p-6 rounded-lg border ${theme === "dark" ? "bg-slate-800 border-slate-700" : "bg-slate-50 border-slate-200"}`}
@@ -403,10 +537,10 @@ const LandingPage = ({ onGetStarted, theme, toggleTheme }) => {
           <h3
             className={`text-xl font-semibold mb-2 ${theme === "dark" ? "text-white" : "text-slate-900"}`}
           >
-            Priority Tags
+            Progress Tracking
           </h3>
           <p className={theme === "dark" ? "text-slate-400" : "text-slate-600"}>
-            Mark tasks with priority levels to focus on what matters most.
+            Track task completion with visual progress bars and priority tags.
           </p>
         </div>
 
@@ -436,9 +570,9 @@ const LandingPage = ({ onGetStarted, theme, toggleTheme }) => {
 
 export default function KanbanBoard() {
   const [showLanding, setShowLanding] = useState(true);
-  const [currentSessionId, setCurrentSessionId] = useState(null);
-  const [allSessions, setAllSessions] = useState([]);
-  const [authMode, setAuthMode] = useState("login");
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [allSessions, setAllSessions] = useState<Session[]>([]);
+  const [authMode, setAuthMode] = useState<AuthMode>("login");
 
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
@@ -446,29 +580,35 @@ export default function KanbanBoard() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const [columns, setColumns] = useState([]);
-  const [tasks, setTasks] = useState([]);
-  const [viewMode, setViewMode] = useState("kanban");
-  const [theme, setThemeState] = useState("light");
+  const [columns, setColumns] = useState<Column[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [viewMode, setViewMode] = useState<ViewMode>("kanban");
+  const [theme, setThemeState] = useState<Theme>("light");
 
   const [newColumnTitle, setNewColumnTitle] = useState("");
   const [showAddColumn, setShowAddColumn] = useState(false);
-  const [newTaskColumn, setNewTaskColumn] = useState(null);
+  const [newTaskColumn, setNewTaskColumn] = useState<string | null>(null);
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskDesc, setNewTaskDesc] = useState("");
-  const [newTaskPriority, setNewTaskPriority] = useState("medium");
-  const [editingColumn, setEditingColumn] = useState(null);
+  const [newTaskPriority, setNewTaskPriority] =
+    useState<Task["priority"]>("medium");
+  const [editingColumn, setEditingColumn] = useState<string | null>(null);
   const [editColumnTitle, setEditColumnTitle] = useState("");
 
-  const [draggedTask, setDraggedTask] = useState(null);
+  const [draggedTask, setDraggedTask] = useState<Task | null>(null);
+  const [editingTask, setEditingTask] = useState<string | null>(null);
+  const [editTaskProgress, setEditTaskProgress] = useState(0);
 
   useEffect(() => {
     const savedTheme = getTheme();
     setThemeState(savedTheme);
-    setAllSessions(getAllSessions());
-
     const sessions = getAllSessions();
-    if (sessions.length > 0) {
+    setAllSessions(sessions);
+
+    if (sessions.length === 1) {
+      setCurrentSessionId(sessions[0].id);
+      setShowLanding(false);
+    } else if (sessions.length > 1) {
       setShowLanding(false);
     }
   }, []);
@@ -493,7 +633,7 @@ export default function KanbanBoard() {
   }, [currentSessionId]);
 
   useEffect(() => {
-    const handleStorage = (e) => {
+    const handleStorage = (e: StorageEvent) => {
       if (e.key === STORAGE_KEYS.SYNC) {
         const sessions = getAllSessions();
         setAllSessions(sessions);
@@ -523,7 +663,7 @@ export default function KanbanBoard() {
   }, [currentSessionId]);
 
   const toggleTheme = () => {
-    const newTheme = theme === "light" ? "dark" : "light";
+    const newTheme: Theme = theme === "light" ? "dark" : "light";
     setTheme(newTheme);
     setThemeState(newTheme);
   };
@@ -551,7 +691,7 @@ export default function KanbanBoard() {
       setEmail("");
       setPassword("");
     } catch (err) {
-      setError(err.message);
+      setError((err as Error).message);
     } finally {
       setLoading(false);
     }
@@ -579,20 +719,22 @@ export default function KanbanBoard() {
       setUsername("");
       setPassword("");
     } catch (err) {
-      setError(err.message);
+      setError((err as Error).message);
     } finally {
       setLoading(false);
     }
   };
 
   const handleLogout = () => {
+    if (!currentSessionId) return;
     deleteSession(currentSessionId);
     setCurrentSessionId(null);
     setColumns([]);
     setTasks([]);
-    setAllSessions(getAllSessions());
+    const sessions = getAllSessions();
+    setAllSessions(sessions);
 
-    if (getAllSessions().length === 0) {
+    if (sessions.length === 0) {
       setShowLanding(true);
     }
   };
@@ -606,13 +748,14 @@ export default function KanbanBoard() {
     setShowLanding(true);
   };
 
-  const handleSwitchSession = (sessionId) => {
+  const handleSwitchSession = (sessionId: string) => {
     setCurrentSessionId(sessionId);
   };
 
   const handleAddColumn = () => {
-    if (!newColumnTitle.trim()) return;
+    if (!newColumnTitle.trim() || !currentSessionId) return;
     const session = getSessionById(currentSessionId);
+    if (!session) return;
     createColumn(session.userId, newColumnTitle);
     const board = getUserBoard(session.userId);
     setColumns([...board.columns]);
@@ -620,9 +763,10 @@ export default function KanbanBoard() {
     setShowAddColumn(false);
   };
 
-  const handleEditColumn = (columnId) => {
-    if (!editColumnTitle.trim()) return;
+  const handleEditColumn = (columnId: string) => {
+    if (!editColumnTitle.trim() || !currentSessionId) return;
     const session = getSessionById(currentSessionId);
+    if (!session) return;
     updateColumn(session.userId, columnId, { title: editColumnTitle });
     const board = getUserBoard(session.userId);
     setColumns([...board.columns]);
@@ -630,8 +774,10 @@ export default function KanbanBoard() {
     setEditColumnTitle("");
   };
 
-  const handleDeleteColumn = (columnId) => {
+  const handleDeleteColumn = (columnId: string) => {
+    if (!currentSessionId) return;
     const session = getSessionById(currentSessionId);
+    if (!session) return;
     deleteColumn(session.userId, columnId);
     const board = getUserBoard(session.userId);
     setColumns([...board.columns]);
@@ -639,14 +785,16 @@ export default function KanbanBoard() {
   };
 
   const handleAddTask = () => {
-    if (!newTaskTitle.trim() || !newTaskColumn) return;
+    if (!newTaskTitle.trim() || !newTaskColumn || !currentSessionId) return;
     const session = getSessionById(currentSessionId);
+    if (!session) return;
     createTask(
       session.userId,
       newTaskColumn,
       newTaskTitle,
       newTaskDesc,
       newTaskPriority,
+      0,
     );
     const board = getUserBoard(session.userId);
     setTasks([...board.tasks]);
@@ -656,27 +804,39 @@ export default function KanbanBoard() {
     setNewTaskColumn(null);
   };
 
-  const handleDeleteTask = (taskId) => {
+  const handleDeleteTask = (taskId: string) => {
+    if (!currentSessionId) return;
     const session = getSessionById(currentSessionId);
+    if (!session) return;
     deleteTask(session.userId, taskId);
     const board = getUserBoard(session.userId);
     setTasks([...board.tasks]);
   };
 
-  const handleDragStart = (e, task) => {
+  const handleUpdateTaskProgress = (taskId: string, progress: number) => {
+    if (!currentSessionId) return;
+    const session = getSessionById(currentSessionId);
+    if (!session) return;
+    updateTask(session.userId, taskId, { progress });
+    const board = getUserBoard(session.userId);
+    setTasks([...board.tasks]);
+  };
+
+  const handleDragStart = (e: React.DragEvent, task: Task) => {
     setDraggedTask(task);
     e.dataTransfer.effectAllowed = "move";
   };
 
-  const handleDragOver = (e) => {
+  const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
   };
 
-  const handleDrop = (e, columnId) => {
+  const handleDrop = (e: React.DragEvent, columnId: string) => {
     e.preventDefault();
-    if (draggedTask && draggedTask.columnId !== columnId) {
+    if (draggedTask && draggedTask.columnId !== columnId && currentSessionId) {
       const session = getSessionById(currentSessionId);
+      if (!session) return;
       updateTask(session.userId, draggedTask.id, { columnId });
       const board = getUserBoard(session.userId);
       setTasks([...board.tasks]);
@@ -819,6 +979,11 @@ export default function KanbanBoard() {
                       ? "Don't have an account? Sign up"
                       : "Already have an account? Login"}
                   </Button>
+                  <p
+                    className={`text-xs text-center ${theme === "dark" ? "text-slate-500" : "text-slate-400"}`}
+                  >
+                    Created by augustinezuka@gmail.com
+                  </p>
                 </CardContent>
               </Card>
 
@@ -900,7 +1065,7 @@ export default function KanbanBoard() {
       <div
         className={`border-b ${theme === "dark" ? "bg-slate-800 border-slate-700" : "bg-white border-slate-200"}`}
       >
-        <div className=" px-8 py-4 flex items-center justify-between">
+        <div className="px-8 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <h1
               className={`text-2xl font-bold ${theme === "dark" ? "text-white" : "text-slate-900"}`}
@@ -989,7 +1154,7 @@ export default function KanbanBoard() {
         )}
       </div>
 
-      <div className=" p-4">
+      <div className="p-4">
         {viewMode === "kanban" ? (
           <div className="flex gap-4 overflow-x-auto pb-4">
             {columns.map((column) => (
@@ -1114,10 +1279,58 @@ export default function KanbanBoard() {
                               {task.description}
                             </p>
                           )}
-                          <PriorityBadge
-                            priority={task.priority}
-                            theme={theme}
-                          />
+                          <div className="flex items-center gap-2 mb-2">
+                            <PriorityBadge
+                              priority={task.priority}
+                              theme={theme}
+                            />
+                          </div>
+                          <div className="mb-2">
+                            <ProgressBar
+                              progress={task.progress}
+                              theme={theme}
+                            />
+                          </div>
+                          {editingTask === task.id ? (
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="range"
+                                min="0"
+                                max="100"
+                                value={editTaskProgress}
+                                onChange={(e) =>
+                                  setEditTaskProgress(Number(e.target.value))
+                                }
+                                className="flex-1"
+                              />
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => {
+                                  handleUpdateTaskProgress(
+                                    task.id,
+                                    editTaskProgress,
+                                  );
+                                  setEditingTask(null);
+                                }}
+                                className="text-green-600 hover:text-green-700 h-6 px-2"
+                              >
+                                <Check className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                setEditingTask(task.id);
+                                setEditTaskProgress(task.progress);
+                              }}
+                              className={`w-full text-xs ${theme === "dark" ? "text-slate-400 hover:text-slate-300" : "text-slate-600 hover:text-slate-900"}`}
+                            >
+                              Update Progress
+                            </Button>
+                          )}
                         </div>
                       ))}
 
@@ -1140,8 +1353,16 @@ export default function KanbanBoard() {
                           />
                           <select
                             value={newTaskPriority}
-                            onChange={(e) => setNewTaskPriority(e.target.value)}
-                            className={`w-full p-2 text-sm border rounded-md ${theme === "dark" ? "bg-slate-600 border-slate-500 text-white" : "border-slate-300 bg-white"}`}
+                            onChange={(e) =>
+                              setNewTaskPriority(
+                                e.target.value as Task["priority"],
+                              )
+                            }
+                            className={`w-full p-2 text-sm border rounded-md ${
+                              theme === "dark"
+                                ? "bg-slate-600 border-slate-500 text-white"
+                                : "border-slate-300 bg-white"
+                            }`}
                           >
                             <option value="low">Low Priority</option>
                             <option value="medium">Medium Priority</option>
@@ -1286,10 +1507,10 @@ export default function KanbanBoard() {
                             : "border-slate-200 bg-slate-50"
                         }`}
                       >
-                        <div className="flex-1">
-                          <div className="flex items-start gap-2 mb-2">
+                        <div className="flex-1 space-y-2">
+                          <div className="flex items-start gap-2">
                             <h4
-                              className={`font-medium ${theme === "dark" ? "text-white" : "text-slate-900"}`}
+                              className={`font-medium flex-1 ${theme === "dark" ? "text-white" : "text-slate-900"}`}
                             >
                               {task.title}
                             </h4>
@@ -1305,12 +1526,53 @@ export default function KanbanBoard() {
                               {task.description}
                             </p>
                           )}
+                          <ProgressBar progress={task.progress} theme={theme} />
+                          {editingTask === task.id ? (
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="range"
+                                min="0"
+                                max="100"
+                                value={editTaskProgress}
+                                onChange={(e) =>
+                                  setEditTaskProgress(Number(e.target.value))
+                                }
+                                className="flex-1"
+                              />
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => {
+                                  handleUpdateTaskProgress(
+                                    task.id,
+                                    editTaskProgress,
+                                  );
+                                  setEditingTask(null);
+                                }}
+                                className="text-green-600 hover:text-green-700"
+                              >
+                                <Check className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                setEditingTask(task.id);
+                                setEditTaskProgress(task.progress);
+                              }}
+                              className={`text-xs ${theme === "dark" ? "text-slate-400 hover:text-slate-300" : "text-slate-600 hover:text-slate-900"}`}
+                            >
+                              Update Progress
+                            </Button>
+                          )}
                         </div>
                         <Button
                           size="sm"
                           variant="ghost"
                           onClick={() => handleDeleteTask(task.id)}
-                          className="text-red-600 hover:text-red-700"
+                          className="text-red-600 hover:text-red-700 ml-2"
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
@@ -1322,6 +1584,11 @@ export default function KanbanBoard() {
           </div>
         )}
       </div>
+      <footer
+        className={`text-center py-4 text-xs ${theme === "dark" ? "text-slate-500" : "text-slate-400"}`}
+      >
+        Created by augustinezuka@gmail.com
+      </footer>
     </div>
   );
 }
